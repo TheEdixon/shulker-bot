@@ -1,3 +1,4 @@
+import os
 import discord
 from discord.ext import commands
 import sqlite3
@@ -180,4 +181,5 @@ async def on_ready():
 # EJECUTAR BOT
 # ===============================
 bot.run(TOKEN)
+
 
