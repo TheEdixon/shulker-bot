@@ -5,7 +5,7 @@ import sqlite3
 from datetime import date
 
 # ===============================
-# CONFIGURACIÓN (CAMBIA ESTO)
+# CONFIGURACIÓN
 # ===============================
 FORM_CHANNEL_ID = 1465764092978532547     # Canal del formulario
 LOG_CHANNEL_ID = 1462316362515873947      # Canal donde llegan los registros
@@ -160,26 +160,32 @@ class ShulkerButton(discord.ui.View):
         await interaction.response.send_modal(ShulkerModal())
 
 # ===============================
-# EVENTO READY
+# EVENTO READY (CON LIMPIEZA)
 # ===============================
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
     channel = bot.get_channel(FORM_CHANNEL_ID)
-    if channel:
-        await channel.send(
-            embed=discord.Embed(
-                title="🧰 Registro de Shulker",
-                description="Presiona el botón para registrar cuántas shulker colocaste hoy.",
-                color=discord.Color.green()
-            ),
-            view=ShulkerButton()
-        )
+    if not channel:
+        return
+
+    # 🧼 LIMPIAR MENSAJES ANTIGUOS DEL BOT
+    async for message in channel.history(limit=50):
+        if message.author == bot.user:
+            await message.delete()
+
+    # 📌 ENVIAR FORMULARIO ÚNICO
+    await channel.send(
+        embed=discord.Embed(
+            title="🧰 Registro de Shulker",
+            description="Presiona el botón para registrar cuántas shulker colocaste hoy.",
+            color=discord.Color.green()
+        ),
+        view=ShulkerButton()
+    )
 
 # ===============================
 # EJECUTAR BOT
 # ===============================
 bot.run(TOKEN)
-
-
