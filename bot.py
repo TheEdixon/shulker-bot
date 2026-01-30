@@ -9,7 +9,7 @@ from datetime import date
 FORM_CHANNEL_ID = 1465764092978532547     # Canal del formulario
 LOG_CHANNEL_ID = 1462316362515873947      # Canal donde llegan los registros
 RANKING_CHANNEL_ID = 1462316362515873948  # Canal del ranking
-TOKEN = ""
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 # ===============================
 # CONFIGURACIÓN DEL BOT
@@ -180,3 +180,4 @@ async def on_ready():
 # EJECUTAR BOT
 # ===============================
 bot.run(TOKEN)
+
