@@ -1,16 +1,19 @@
 import os
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import sqlite3
 from datetime import date
+import time
 
 # ===============================
 # CONFIGURACIÓN
 # ===============================
-FORM_CHANNEL_ID = 1465764092978532547     # Canal del formulario
-LOG_CHANNEL_ID = 1462316362515873947      # Canal donde llegan los registros
-RANKING_CHANNEL_ID = 1462316362515873948  # Canal del ranking
+FORM_CHANNEL_ID = 1465764092978532547
+LOG_CHANNEL_ID = 1462316362515873947
+RANKING_CHANNEL_ID = 1462316362515873948
 TOKEN = os.getenv("DISCORD_TOKEN")
+
+COOLDOWN_SECONDS = 60  # ⏱ antispam por usuario
 
 # ===============================
 # CONFIGURACIÓN DEL BOT
@@ -36,6 +39,21 @@ CREATE TABLE IF NOT EXISTS shulker (
 )
 """)
 db.commit()
+
+# ===============================
+# ANTISPAM (MEMORIA)
+# ===============================
+cooldowns = {}
+
+# ===============================
+# RESET DIARIO AUTOMÁTICO
+# ===============================
+@tasks.loop(minutes=1)
+async def reset_diario():
+    hoy = str(date.today())
+
+    cursor.execute("DELETE FROM shulker WHERE fecha != ?", (hoy,))
+    db.commit()
 
 # ===============================
 # FUNCIÓN RANKING
@@ -88,6 +106,21 @@ class ShulkerModal(discord.ui.Modal, title="Registro de Shulker"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        ahora = time.time()
+
+        # 🛡 ANTISPAM
+        if user_id in cooldowns:
+            restante = COOLDOWN_SECONDS - (ahora - cooldowns[user_id])
+            if restante > 0:
+                await interaction.response.send_message(
+                    f"⏳ Debes esperar {int(restante)} segundos antes de volver a registrar.",
+                    ephemeral=True
+                )
+                return
+
+        cooldowns[user_id] = ahora
+
         try:
             cantidad_int = int(self.cantidad.value)
             if cantidad_int <= 0:
@@ -100,7 +133,6 @@ class ShulkerModal(discord.ui.Modal, title="Registro de Shulker"):
             return
 
         hoy = str(date.today())
-        user_id = interaction.user.id
         username = interaction.user.display_name
 
         cursor.execute("""
@@ -160,22 +192,24 @@ class ShulkerButton(discord.ui.View):
         await interaction.response.send_modal(ShulkerModal())
 
 # ===============================
-# EVENTO READY (CON LIMPIEZA)
+# EVENTO READY
 # ===============================
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
+    if not reset_diario.is_running():
+        reset_diario.start()
+
     channel = bot.get_channel(FORM_CHANNEL_ID)
     if not channel:
         return
 
-    # 🧼 LIMPIAR MENSAJES ANTIGUOS DEL BOT
+    # 🧼 LIMPIEZA DEL CANAL FORMULARIO
     async for message in channel.history(limit=50):
         if message.author == bot.user:
             await message.delete()
 
-    # 📌 ENVIAR FORMULARIO ÚNICO
     await channel.send(
         embed=discord.Embed(
             title="🧰 Registro de Shulker",
